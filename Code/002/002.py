@@ -29,14 +29,24 @@ FS = ("Segoe UI", 9)
 
 # ── Data helpers ──────────────────────────────────────────────────────────────
 def load():
-    if os.path.exists(FILE):
-        with open(FILE, "r") as f:
-            return json.load(f)
-    return []
+    if not os.path.exists(FILE):
+        return []
+    with open(FILE, "r", encoding="utf-8") as f:
+        raw = json.load(f)
+    migrated = []
+    for t in raw:
+        migrated.append({
+            "date":     t.get("date")     or t.get("วันที่",    ""),
+            "type":     t.get("type")     or t.get("ประเภท",    "Income"),
+            "category": t.get("category") or t.get("หมวดหมู่", "Other"),
+            "amount":   t.get("amount")   or t.get("จำนวนเงิน", 0.0),
+            "note":     t.get("note")     or t.get("หมายเหตุ",  ""),
+        })
+    return migrated
 
 def save(data):
-    with open(FILE, "w") as f:
-        json.dump(data, f, indent=2)
+    with open(FILE, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=2, ensure_ascii=False)
 
 def add_entry(data, kind, cat, amount, note):
     data.append({
@@ -64,6 +74,7 @@ def get_summary(data):
     }
 
 # ── Application ───────────────────────────────────────────────────────────────
+
 class App(tk.Tk):
     def __init__(self):
         super().__init__()
@@ -83,6 +94,7 @@ class App(tk.Tk):
         self._refresh()
 
     # ── Build UI ──────────────────────────────────────────────────────────────
+
     def _build(self):
         # Fixed-width sidebar on the left
         self.sb_frame = tk.Frame(self, bg=C["sidebar"], width=260)
@@ -102,6 +114,7 @@ class App(tk.Tk):
         self._form()
 
     # ── Sidebar form ──────────────────────────────────────────────────────────
+
     def _form(self):
         sb = self.sb_frame
         tk.Label(sb, text="💰 Finance Tracker", bg=C["sidebar"], fg="white",
@@ -205,7 +218,6 @@ class App(tk.Tk):
         self.tree.tag_configure("Expense", foreground=C["expense"])
 
     def _resize_cols(self, total_width):
-        """Distribute available width proportionally to each column."""
         avail = max(total_width - 20, 1)
         total = sum(self._col_weights.values())
         for col, w in self._col_weights.items():
