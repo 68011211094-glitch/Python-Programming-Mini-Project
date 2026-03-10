@@ -44,8 +44,8 @@ class DataManager:
         self.save()
 
     def summary(self):
-        income  = sum(r["amount"] for r in self.records if r["type"] == "income")
-        expense = sum(r["amount"] for r in self.records if r["type"] == "expense")
+        income  = sum(r["amount"] for r in self.records if r["type"].lower() == "income")
+        expense = sum(r["amount"] for r in self.records if r["type"].lower() == "expense")
         return income, expense, income - expense
 
 
@@ -140,9 +140,9 @@ class App(tk.Tk):
 
         # Category, Description, Amount
         fields = [
-            ("Category",    None),
-            ("Description", "entry"),
-            ("Amount ($)",  "amount"),
+            ("Category",      None),
+            ("Note (optional)", "entry"),
+            ("Amount (THB)",    "amount"),
         ]
         for label, kind in fields:
             tk.Label(form, text=label, font=("Segoe UI", 10),
@@ -196,7 +196,7 @@ class App(tk.Tk):
         tree_frame.rowconfigure(0, weight=1)
         tree_frame.columnconfigure(0, weight=1)
 
-        cols = ("Date", "Type", "Category", "Description", "Amount")
+        cols = ("Date", "Type", "Category", "Note", "Amount")
         self.tree = ttk.Treeview(
             tree_frame, columns=cols, show="headings", selectmode="browse")
 
@@ -224,7 +224,7 @@ class App(tk.Tk):
         card.pack(fill="x", pady=(0, 6))
         tk.Label(card, text=label, font=("Segoe UI", 9),
                  bg=color, fg="white").pack(anchor="w")
-        val = tk.Label(card, text="$0.00",
+        val = tk.Label(card, text="฿0.00",
                        font=("Segoe UI", 15 if large else 12, "bold"),
                        bg=color, fg="white")
         val.pack(anchor="w")
@@ -253,16 +253,12 @@ class App(tk.Tk):
         except:
             messagebox.showwarning("Invalid Input", "Please enter a valid positive amount.")
             return
-        if not desc:
-            messagebox.showwarning("Invalid Input", "Please enter a description.")
-            return
-
         self.dm.add({
             "date":     datetime.now().strftime("%d/%m/%Y %H:%M"),
-            "type":     self.tx_type.get(),
+            "type":     self.tx_type.get().capitalize(),
             "category": self.var_cat.get(),
-            "desc":     desc,
             "amount":   amount,
+            "note":     desc,
         })
         self.ent_desc.delete(0, "end")
         self.ent_amt.delete(0, "end")
@@ -276,6 +272,7 @@ class App(tk.Tk):
             messagebox.showinfo("No Selection", "Please select a row to delete.")
             return
         if messagebox.askyesno("Confirm Delete", "Delete selected transaction?"):
+            # Table is reversed, so convert tree index → record index
             n = len(self.dm.records)
             self.dm.delete(n - 1 - self.tree.index(sel[0]))
             self._refresh()
@@ -283,22 +280,22 @@ class App(tk.Tk):
     def _refresh(self):
         """Recalculate summary cards and repopulate the table."""
         income, expense, balance = self.dm.summary()
-        self.lbl_income.config(text=f"${income:,.2f}")
-        self.lbl_expense.config(text=f"${expense:,.2f}")
-        self.lbl_balance.config(text=f"${balance:,.2f}")
+        self.lbl_income.config(text=f"฿{income:,.2f}")
+        self.lbl_expense.config(text=f"฿{expense:,.2f}")
+        self.lbl_balance.config(text=f"฿{balance:,.2f}")
 
         for row in self.tree.get_children():
             self.tree.delete(row)
         for r in reversed(self.dm.records):
-            tag  = r.get("type", "expense")
-            sign = "+" if tag == "income" else "-"
+            tag_raw = r.get("type", "expense").lower()
+            sign    = "+" if tag_raw == "income" else "-"
             self.tree.insert("", "end", values=(
                 r.get("date", "-"),
-                tag.capitalize(),
+                tag_raw.capitalize(),
                 r.get("category", "-"),
-                r.get("desc", "-"),
-                f"{sign}${r.get('amount', 0):,.2f}",
-            ), tags=(tag,))
+                r.get("note", r.get("desc", "-")),
+                f"{sign}฿{r.get('amount', 0):,.2f}",
+            ), tags=(tag_raw,))
 
 # ── Run ──────────────────────────────────────────────────────
 if __name__ == "__main__":
